@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+*.egg-info/
+
+# Front-end
+Front-End/node_modules/
+Front-End/.next/
+Front-End/.env.local
+Front-End/frontend/
+
+# Misc
+.DS_Store
+*.swp
+Front-End/*.tsbuildinfo

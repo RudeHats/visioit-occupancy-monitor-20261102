@@ -1,0 +1,112 @@
+import type { MonitorEvent, Seat } from "../monitoring/domain"
+
+export const demoSeats: Seat[] = [
+  { id: "A-01", name: "A-01 · Window row", state: "occupied", confidence: 0.96, durationLabel: "08m 12s", cameraId: "CAM-01", thumbnailPosition: "24% 70%" },
+  { id: "A-02", name: "A-02 · Window row", state: "occupied", confidence: 0.93, durationLabel: "05m 48s", cameraId: "CAM-01", thumbnailPosition: "34% 67%" },
+  { id: "A-03", name: "A-03 · Center row", state: "occupied", confidence: 0.89, durationLabel: "12m 06s", cameraId: "CAM-01", thumbnailPosition: "47% 68%" },
+  { id: "A-04", name: "A-04 · Center row", state: "vacant", confidence: 0.83, durationLabel: "04m 02s", cameraId: "CAM-01", thumbnailPosition: "60% 70%" },
+  { id: "A-05", name: "A-05 · Center row", state: "vacant", confidence: 0.79, durationLabel: "01m 36s", cameraId: "CAM-01", thumbnailPosition: "72% 69%" },
+  { id: "A-06", name: "A-06 · East row", state: "uncertain", confidence: 0.51, durationLabel: "00m 18s", cameraId: "CAM-01", thumbnailPosition: "83% 69%" },
+  { id: "A-07", name: "A-07 · East row", state: "transitioning", confidence: null, durationLabel: "Verifying", cameraId: "CAM-01", thumbnailPosition: "90% 69%" },
+  { id: "A-08", name: "A-08 · East row", state: "camera_unavailable", confidence: null, durationLabel: "No valid frames", cameraId: "CAM-02", thumbnailPosition: "12% 42%" },
+  { id: "B-01", name: "B-01 · South row", state: "occupied", confidence: 0.98, durationLabel: "15m 24s", cameraId: "CAM-02", thumbnailPosition: "25% 76%" },
+  { id: "B-02", name: "B-02 · South row", state: "occupied", confidence: 0.95, durationLabel: "07m 31s", cameraId: "CAM-02", thumbnailPosition: "39% 76%" },
+  { id: "B-03", name: "B-03 · South row", state: "occupied", confidence: 0.92, durationLabel: "03m 09s", cameraId: "CAM-02", thumbnailPosition: "53% 76%" },
+  { id: "B-04", name: "B-04 · South row", state: "model_error", confidence: null, durationLabel: "Inference paused", cameraId: "CAM-02", thumbnailPosition: "68% 76%" },
+]
+
+export const demoEvents: MonitorEvent[] = [
+  {
+    id: "demo-vacancy-001",
+    type: "vacancy_confirmed",
+    severity: "warning",
+    seatId: "A-04",
+    seatName: "A-04 · Center row",
+    timeLabel: "2 min ago",
+    ageMinutes: 2,
+    description: "Vacant beyond the local preview threshold.",
+    vacantForSeconds: 242,
+    acknowledged: false,
+  },
+  {
+    id: "demo-state-002",
+    type: "state_changed",
+    severity: "info",
+    seatId: "B-03",
+    seatName: "B-03 · South row",
+    timeLabel: "6 min ago",
+    ageMinutes: 6,
+    description: "Seat in use · state verified in the local preview.",
+    acknowledged: false,
+  },
+  {
+    id: "demo-camera-003",
+    type: "camera_unavailable",
+    severity: "warning",
+    seatId: "A-08",
+    seatName: "A-08 · East row",
+    timeLabel: "9 min ago",
+    ageMinutes: 9,
+    description: "No valid frames. This is not a vacancy signal.",
+    acknowledged: false,
+  },
+  {
+    id: "demo-model-004",
+    type: "model_error",
+    severity: "critical",
+    seatId: "B-04",
+    seatName: "B-04 · South row",
+    timeLabel: "17 min ago",
+    ageMinutes: 17,
+    description: "Inference paused in the local preview.",
+    acknowledged: false,
+  },
+  {
+    id: "demo-state-005",
+    type: "state_changed",
+    severity: "info",
+    seatId: "A-02",
+    seatName: "A-02 · Window row",
+    timeLabel: "21 min ago",
+    ageMinutes: 21,
+    description: "Seat in use · state verified in the local preview.",
+    acknowledged: true,
+  },
+]
+
+export const demoOccupancyTrend = [
+  { label: "−60m", occupied: 4, vacant: 4 },
+  { label: "−55m", occupied: 5, vacant: 3 },
+  { label: "−50m", occupied: 6, vacant: 3 },
+  { label: "−45m", occupied: 6, vacant: 2 },
+  { label: "−40m", occupied: 7, vacant: 2 },
+  { label: "−35m", occupied: 7, vacant: 2 },
+  { label: "−30m", occupied: 8, vacant: 2 },
+  { label: "−25m", occupied: 7, vacant: 3 },
+  { label: "−20m", occupied: 7, vacant: 3 },
+  { label: "−15m", occupied: 6, vacant: 3 },
+  { label: "−10m", occupied: 6, vacant: 2 },
+  { label: "Now", occupied: 6, vacant: 2 },
+]
+
+export const demoSeatHistory = [
+  "occupied",
+  "occupied",
+  "occupied",
+  "vacant",
+  "vacant",
+  "vacant",
+  "uncertain",
+  "occupied",
+  "occupied",
+  "occupied",
+  "occupied",
+  "occupied",
+] as const
+
+export const demoSystemLog = [
+  { time: "LOCAL", text: "Local simulation initialized", tone: "ok" },
+  { time: "LOCAL", text: "Generated still frame loaded for CAM-01", tone: "ok" },
+  { time: "LOCAL", text: "Backend connection intentionally not attempted", tone: "neutral" },
+  { time: "LOCAL", text: "Model metadata unavailable in this preview", tone: "warn" },
+] as const
