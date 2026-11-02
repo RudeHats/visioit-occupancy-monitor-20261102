@@ -34,6 +34,8 @@ export const viewport: Viewport = {
   themeColor: "#0B0D10",
 }
 
+import { BackendConnectionProvider } from "@/components/backend-connection-provider"
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -42,7 +44,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className={`${inter.variable} ${jetBrainsMono.variable} antialiased`}>
-        <AppShell>{children}</AppShell>
+        <BackendConnectionProvider><AppShell>{children}</AppShell></BackendConnectionProvider>
         {process.env.NODE_ENV === "production" && <Analytics />}
       </body>
     </html>

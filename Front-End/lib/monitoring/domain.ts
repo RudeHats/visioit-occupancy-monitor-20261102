@@ -56,7 +56,9 @@ export type MonitorEvent = {
 
 export const previewSettingsSchema = z.object({
   source: z.enum(["usb", "rtsp", "file", "synthetic"]),
-  vacancyDurationSeconds: z.number().int().min(30).max(3600),
+  sourceUrl: z.string().default(""),
+  usbIndex: z.number().int().min(0).default(0),
+  vacancyDurationSeconds: z.number().int().min(1).max(86400),
   confidenceThreshold: z.number().min(0).max(1),
   alertCooldownSeconds: z.number().int().min(0).max(3600),
   soundEnabled: z.boolean(),

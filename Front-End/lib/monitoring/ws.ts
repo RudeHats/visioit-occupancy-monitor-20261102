@@ -4,7 +4,7 @@ import { backendHelloSchema, backendInferenceSchema, backendMetricsSchema, backe
 export const wsEnvelopeSchema = z.object({
   type: z.string(),
   ts: z.string(),
-  t_ms: z.number(),
+  t_ms: z.number().optional(),
   data: z.unknown(),
 })
 
@@ -12,37 +12,37 @@ export const wsMessageSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("hello"),
     ts: z.string(),
-    t_ms: z.number(),
+    t_ms: z.number().optional(),
     data: backendHelloSchema,
   }),
   z.object({
     type: z.literal("inference"),
     ts: z.string(),
-    t_ms: z.number(),
+    t_ms: z.number().optional(),
     data: backendInferenceSchema,
   }),
   z.object({
     type: z.literal("state_change"),
     ts: z.string(),
-    t_ms: z.number(),
+    t_ms: z.number().optional(),
     data: backendStateChangeSchema,
   }),
   z.object({
     type: z.literal("event"),
     ts: z.string(),
-    t_ms: z.number(),
+    t_ms: z.number().optional(),
     data: backendEventSchema,
   }),
   z.object({
     type: z.literal("metrics"),
     ts: z.string(),
-    t_ms: z.number(),
+    t_ms: z.number().optional(),
     data: backendMetricsSchema,
   }),
   z.object({
     type: z.literal("health"),
     ts: z.string(),
-    t_ms: z.number(),
+    t_ms: z.number().optional(),
     data: backendHealthMessageSchema,
   }),
 ])

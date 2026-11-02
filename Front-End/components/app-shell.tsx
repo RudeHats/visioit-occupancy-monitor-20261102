@@ -54,45 +54,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const health = useMonitoringStore((state) => state.health)
   const title = routeTitles[pathname] ?? "Occupancy workspace"
 
-  // Auto-connect to backend on mount (when not in mock mode)
-  useEffect(() => {
-    if (mockEnabled) return
-    if (connectionStatus === "connected" || connectionStatus === "reconnecting") return
-
-    const timer = setTimeout(() => {
-      fetch("http://127.0.0.1:8000/api/v1/health")
-        .then(res => res.json())
-        .then(data => {
-          const store = useMonitoringStore.getState()
-          store.setConnection("connected")
-          store.setHealth(data)
-          // Fetch seats
-          fetch("http://127.0.0.1:8000/api/v1/seats")
-            .then(r => r.json())
-            .then(seats => store.setSeats(seats.map(seatFromBackend)))
-            .catch(() => {})
-          // Start polling for updates
-          setInterval(async () => {
-            try {
-              const s = await api.seats()
-              store.setSeats(s.map(seatFromBackend))
-              const h = await api.health()
-              store.setHealth(h)
-            } catch {
-              // silently fail
-            }
-          }, 2000)
-        })
-        .catch(err => {
-          const store = useMonitoringStore.getState()
-          store.setConnection("offline", err.message)
-        })
-    }, 500)
-
-    return () => {
-      clearTimeout(timer)
-    }
-  }, [connectionStatus])
 
   const handleSoundAction = async () => {
     if (!soundUnlocked) {

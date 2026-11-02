@@ -98,7 +98,7 @@ function SystemContent({
             <MetricTile label="p95" value={formatMs(metrics?.inference_ms?.p95)} detail="Backend reported" />
             <MetricTile label="p99" value={formatMs(metrics?.inference_ms?.p99)} detail="Backend reported" />
           </div>
-          <LatencyChart />
+          <LatencyChart values={metrics?.inference_ms} />
         </Panel>
 
         <Panel title="Frame health" subtitle="FPS and dropped frames" simulated={!live}>
@@ -106,11 +106,11 @@ function SystemContent({
             <MetricTile label="Frame rate" value={formatNullableNumber(metrics?.processing_fps)} detail="Backend reported" />
             <MetricTile label="Dropped frames" value={String(metrics?.dropped_frames ?? 0)} detail="Backend reported" />
           </div>
-          <FpsChart />
+          <FpsChart captureFps={metrics?.capture_fps} processingFps={metrics?.processing_fps} />
         </Panel>
 
         <Panel title="Sample detection confidence" subtitle="Distribution of backend seat detections · not accuracy." simulated={!live}>
-          <ConfidenceChart />
+          <ConfidenceChart histogram={metrics?.confidence_hist} />
           <p className="chart-caption">Confidence values come from backend detections. They are not a measure of model accuracy.</p>
         </Panel>
       </div>

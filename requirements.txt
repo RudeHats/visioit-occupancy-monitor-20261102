@@ -5,3 +5,4 @@ numpy>=1.26
 pydantic>=2.9
 torch>=2.7
 ultralytics>=8.0
+imageio-ffmpeg>=0.6

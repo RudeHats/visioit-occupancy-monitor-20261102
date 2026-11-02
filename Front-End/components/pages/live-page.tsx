@@ -35,6 +35,7 @@ export default function LiveMonitoringPage() {
   const snoozeEvent = useMonitoringStore((state) => state.snoozeEvent)
   const runDemoAlert = useMonitoringStore((state) => state.runDemoAlert)
   const connectionStatus = useMonitoringStore((state) => state.connection.status)
+  const metrics = useMonitoringStore((state) => state.metrics)
 
   const lastSoundAt = useRef<number | undefined>(undefined)
   const [selectedSeatId, setSelectedSeatId] = useState("A-07")
@@ -200,6 +201,7 @@ export default function LiveMonitoringPage() {
                   />
                   <MetricTile label="Inference latency" value={formatLatencyMs(useMonitoringStore.getState().metrics?.inference_ms?.last)} detail="Backend reported" />
                   <MetricTile label="FPS" value={useMonitoringStore.getState().metrics?.processing_fps?.toFixed(1) ?? "—"} detail="Backend reported" />
+                  <MetricTile label="People / seats" value={metrics?.occupancy ? `${metrics.occupancy.actual_people}/${metrics.occupancy.expected_seats}` : "—"} detail="Detected seated people / configured capacity" />
                   <MetricTile label="Vacancy timer" value={vacancyTimer} detail={selectedSeat.state !== "vacant" ? "Only runs for a vacant seat" : "Time until the vacancy alert threshold"} />
                   <MetricTile label="Camera" value={selectedSeat.cameraId} detail="Backend source" />
                 </div>
@@ -259,8 +261,9 @@ function formatDurationLabel(seconds: number): string {
 }
 
 function formatCountdown(seconds: number): string {
-  const minutes = Math.floor(seconds / 60)
-  const remainder = seconds % 60
+  const whole = Math.max(0, Math.floor(Number.isFinite(seconds) ? seconds : 0))
+  const minutes = Math.floor(whole / 60)
+  const remainder = whole % 60
   return `${String(minutes).padStart(2, "0")}:${String(remainder).padStart(2, "0")}`
 }
 

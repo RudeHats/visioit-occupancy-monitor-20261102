@@ -1,8 +1,10 @@
 import type { BackendEvent, BackendHealth, BackendInference, BackendMetrics, BackendModel, BackendSettings, BackendSeat } from "./contract"
 import { eventTypeSchema, previewSettingsSchema, seatStateSchema, type EventSeverity, type EventType, type MonitorEvent, type NormalizedPoint, type PreviewSettings, type Seat, type SeatState } from "./domain"
 
-export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000"
-export const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE ?? "ws://localhost:8000"
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "/backend"
+export const WS_BASE = process.env.NEXT_PUBLIC_WS_BASE ?? (typeof window === "undefined"
+  ? "ws://127.0.0.1:8000"
+  : `${window.location.protocol === "https:" ? "wss:" : "ws:"}//${window.location.host}/backend`)
 
 export class ApiError extends Error {
   readonly code: string
@@ -21,6 +23,8 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
+    signal: AbortSignal.timeout(12000),
+    cache: "no-store",
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -57,6 +61,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(source),
     }),
+  sourceTest: (source: { type: string; usb_index?: number; url?: string; path?: string; loop?: boolean; target_fps?: number }) =>
+    request<{ opened: boolean; frames: number; measured_fps: number; first_frame_ms: number | null; decode_errors: number; frame_size: [number, number] | null }>("/api/v1/sources/test", { method: "POST", body: JSON.stringify({ ...source, duration_s: 2 }) }),
   sourcesStop: (): Promise<{ state: string }> => request("/api/v1/sources/stop", { method: "POST" }),
 
   seats: (): Promise<BackendSeat[]> => request<BackendSeat[]>("/api/v1/seats"),
@@ -121,8 +127,8 @@ export function eventFromBackend(raw: BackendEvent, seats: Seat[] = []): Monitor
     severity: (["info", "warning", "critical"] as EventSeverity[]).includes(raw.severity as EventSeverity)
       ? (raw.severity as EventSeverity)
       : "warning",
-    seatId: raw.seat_id,
-    seatName: seat?.name ?? raw.seat_id,
+    seatId: raw.seat_id ?? "system",
+    seatName: seat?.name ?? raw.seat_id ?? "System",
     timeLabel: formatTimeLabel(raw.created_at),
     ageMinutes: Math.round(ageMinutes * 10) / 10,
     description: raw.message,
@@ -137,7 +143,7 @@ export function eventFromBackend(raw: BackendEvent, seats: Seat[] = []): Monitor
 
 export function settingsFromBackend(raw: BackendSettings): PreviewSettings {
   const parsed = previewSettingsSchema.safeParse({
-    source: "synthetic",
+    source: "synthetic", sourceUrl: "", usbIndex: 0,
     vacancyDurationSeconds: Math.round(raw.vacancy_seconds),
     confidenceThreshold: raw.occupied_conf,
     alertCooldownSeconds: Math.round(raw.cooldown_seconds),
@@ -147,7 +153,7 @@ export function settingsFromBackend(raw: BackendSettings): PreviewSettings {
   return parsed.success
     ? parsed.data
     : {
-        source: "synthetic",
+        source: "synthetic", sourceUrl: "", usbIndex: 0,
         vacancyDurationSeconds: 10,
         confidenceThreshold: 0.45,
         alertCooldownSeconds: 120,

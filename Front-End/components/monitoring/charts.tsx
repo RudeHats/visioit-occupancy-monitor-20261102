@@ -85,7 +85,7 @@ export function OccupancyTrendChart() {
   )
 }
 
-export function ConfidenceChart() {
+export function ConfidenceChart({ histogram }: { histogram?: { bins: number[]; counts: number[] } }) {
   const values = demoSeats.flatMap((seat) => (seat.confidence === null ? [] : [seat.confidence]))
   const ranges = [
     { label: "0.50–0.60", minimum: 0.5, maximum: 0.6 },
@@ -96,11 +96,13 @@ export function ConfidenceChart() {
   ]
   const data = ranges.map((range) => ({
     label: range.label,
-    detections: values.filter((value) => value >= range.minimum && value < range.maximum).length,
+    detections: histogram
+      ? histogram.counts.slice(Math.ceil(range.minimum * 10), Math.ceil(range.maximum * 10)).reduce((sum, count) => sum + count, 0)
+      : values.filter((value) => value >= range.minimum && value < range.maximum).length,
   }))
 
   return (
-    <div className="confidence-chart" role="img" aria-label="Confidence distribution for detections in the simulated sample">
+    <div className="confidence-chart" role="img" aria-label="Confidence distribution for detections">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} margin={{ top: 12, right: 8, left: -18, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" />
@@ -112,29 +114,33 @@ export function ConfidenceChart() {
             itemStyle={{ color: "var(--text)", fontSize: 12 }}
             cursor={{ fill: "rgba(255,255,255,0.04)" }}
           />
-          <Bar dataKey="detections" name="Sample detections" fill="var(--accent)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+          <Bar dataKey="detections" name="Detections" fill="var(--accent)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
         </BarChart>
       </ResponsiveContainer>
     </div>
   )
 }
 
-export function LatencyChart() {
+export function LatencyChart({ values }: { values?: { p50?: number | null; p95?: number | null; p99?: number | null } }) {
+  const data = ["p50", "p95", "p99"].map((label) => ({ label, ms: values?.[label as "p50" | "p95" | "p99"] ?? 0 }))
   return (
-    <TelemetryChartPlaceholder
-      title="Inference latency is not reported"
-      description="p50, p95, and p99 require backend frame and inference timestamps. No latency values are fabricated in this preview."
-    />
+    <TelemetryBar data={data} valueKey="ms" name="Latency (ms)" />
   )
 }
 
-export function FpsChart() {
+export function FpsChart({ captureFps, processingFps }: { captureFps?: number | null; processingFps?: number | null }) {
+  const data = [{ label: "Capture", fps: captureFps ?? 0 }, { label: "Inference", fps: processingFps ?? 0 }]
   return (
-    <TelemetryChartPlaceholder
-      title="Frame telemetry is not reported"
-      description="FPS and dropped-frame counts will appear when the camera stream contract is available."
-    />
+    <TelemetryBar data={data} valueKey="fps" name="FPS" />
   )
+}
+
+function TelemetryBar({ data, valueKey, name }: { data: { label: string; [key: string]: number | string }[]; valueKey: string; name: string }) {
+  return <div className="telemetry-chart-placeholder" role="img" aria-label={name}>
+    <ResponsiveContainer width="100%" height="100%"><BarChart data={data} margin={{ top: 12, right: 8, left: -18, bottom: 0 }}>
+      <CartesianGrid vertical={false} stroke="var(--border)" strokeDasharray="3 5" /><XAxis dataKey="label" axisLine={false} tickLine={false} /><YAxis axisLine={false} tickLine={false} /><Tooltip /><Bar dataKey={valueKey} name={name} fill="var(--accent)" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+    </BarChart></ResponsiveContainer>
+  </div>
 }
 
 function TelemetryChartPlaceholder({ title, description }: { title: string; description: string }) {

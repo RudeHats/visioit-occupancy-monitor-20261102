@@ -18,16 +18,23 @@ import type { PreviewSettings } from "@/lib/monitoring/domain"
 
 export function SourceSelector({
   source,
+  sourceUrl,
+  usbIndex,
+  onSourceUrlChange,
+  onUsbIndexChange,
   onChange,
 }: {
   source: PreviewSettings["source"]
+  sourceUrl: string
+  usbIndex: number
+  onSourceUrlChange: (value: string) => void
+  onUsbIndexChange: (value: number) => void
   onChange: (source: PreviewSettings["source"]) => void
 }) {
   const [fileName, setFileName] = useState("")
-  const [rtspAddress, setRtspAddress] = useState("")
 
   return (
-    <Panel title="Camera source" subtitle="Choose a source type for the preview" simulated>
+    <Panel title="Camera source" subtitle="Choose and persist the backend source" simulated={false}>
       <FieldGroup>
         <Field>
           <FieldLabel htmlFor="camera-source">Source type</FieldLabel>
@@ -60,13 +67,11 @@ export function SourceSelector({
         )}
 
         {source === "usb" && (
-          <Alert className="source-preview-note">
-            <Radio size={15} strokeWidth={1.75} aria-hidden="true" />
-            <div>
-              <AlertTitle>Camera discovery unavailable</AlertTitle>
-              <AlertDescription>USB device enumeration requires the backend source-discovery contract.</AlertDescription>
-            </div>
-          </Alert>
+          <Field>
+            <FieldLabel htmlFor="usb-index">USB camera index</FieldLabel>
+            <Input id="usb-index" type="number" min={0} step={1} value={usbIndex} onChange={(event) => onUsbIndexChange(Number(event.target.value) || 0)} />
+            <FieldDescription>Index is resolved by the backend host and retained between reloads.</FieldDescription>
+          </Field>
         )}
 
         {source === "rtsp" && (
@@ -75,13 +80,13 @@ export function SourceSelector({
             <Input
               id="rtsp-address"
               type="url"
-              value={rtspAddress}
-              onChange={(event) => setRtspAddress(event.target.value)}
+              value={sourceUrl}
+              onChange={(event) => onSourceUrlChange(event.target.value)}
               placeholder="rtsp://camera-host/stream"
               autoComplete="off"
               spellCheck={false}
             />
-            <FieldDescription>This value stays in this page and is not saved or sent.</FieldDescription>
+            <FieldDescription>Saved locally and sent to the backend when applied.</FieldDescription>
           </Field>
         )}
 

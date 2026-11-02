@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
-import { AlertTriangle, Check, RotateCcw, Volume2 } from "lucide-react"
+import { AlertTriangle, Check, RotateCcw, Volume2, Wifi } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -10,13 +10,12 @@ import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { ErrorState } from "@/components/monitoring/error-state"
 import { PageHeader, Panel } from "@/components/monitoring/ui"
-import { SimulationBadge } from "@/components/monitoring/simulation-badge"
 import { SourceSelector } from "@/components/monitoring/source-selector"
 import { ThresholdForm, type PreviewSettingsErrors } from "@/components/monitoring/threshold-form"
 import { defaultPreviewSettings, mockEnabled, useMonitoringStore } from "@/lib/monitoring/store"
 import { previewSettingsSchema, type PreviewSettings } from "@/lib/monitoring/domain"
 import { enableAlertAudio, playAlertTone } from "@/lib/monitoring/alert-audio"
-import { api } from "@/lib/monitoring/api"
+import { api, streamUrl } from "@/lib/monitoring/api"
 
 export default function SettingsPage() {
   const settings = useMonitoringStore((state) => state.settings)
@@ -27,6 +26,7 @@ export default function SettingsPage() {
   const setSoundUnlocked = useMonitoringStore((state) => state.setSoundUnlocked)
   const setSoundBlocked = useMonitoringStore((state) => state.setSoundBlocked)
   const connectionStatus = useMonitoringStore((state) => state.connection.status)
+  const modelInfo = useMonitoringStore((state) => state.modelInfo)
   const [draft, setDraft] = useState<PreviewSettings>(settings)
   const [errors, setErrors] = useState<PreviewSettingsErrors>({})
   const [saveMessage, setSaveMessage] = useState("")
@@ -53,36 +53,26 @@ export default function SettingsPage() {
       return
     }
 
-    updateSettings(result.data)
     setErrors({})
-    if (connectionStatus === "connected") {
-      void api
-        .settingsPut({
+    if (mockEnabled) {
+      updateSettings(result.data)
+      setSaveMessage("Preview settings saved.")
+      return
+    }
+    void (async () => {
+      try {
+        await api.settingsPut({
           vacancy_seconds: result.data.vacancyDurationSeconds,
           cooldown_seconds: result.data.alertCooldownSeconds,
           occupied_conf: result.data.confidenceThreshold,
-          low_conf: 0.2,
-          min_overlap_occ: 0.35,
-          min_overlap_any: 0.05,
-          enter_occupied: result.data.confidenceThreshold,
-          exit_occupied: 0.35,
-          smoothing_tau_s: 1.5,
-          confirm_s: 1.0,
-          show_transition_s: 0.6,
-          uncertain_hold_s: 2.0,
-          uncertain_warn_seconds: 30.0,
-          stale_timeout_s: 3.0,
-          recovery_grace_s: 3.0,
-          crop_padding: 0.1,
-          inference_mode: "roi_crop",
-          target_inference_fps: 5.0,
-          min_sharpness: 1.0,
         })
-        .then(() => setSaveMessage("Settings saved to the backend."))
-        .catch(() => setSaveMessage("Backend settings were not saved. Check the backend connection."))
-    } else {
-      setSaveMessage("Settings saved for this preview session. No backend was modified.")
-    }
+        updateSettings(result.data)
+        await switchSource(result.data.source)
+        setSaveMessage("Settings saved. Camera connection status is shown in the preview.")
+      } catch (error) {
+        setSaveMessage(error instanceof Error ? error.message : "Could not apply settings.")
+      }
+    })()
   }
 
   const handleReset = () => {
@@ -127,22 +117,22 @@ export default function SettingsPage() {
       <PageHeader
         eyebrow="CONFIGURATION"
         title="Settings"
-        description="Preview-only controls. Changes stay in memory and are never sent to a backend."
-        actions={<SimulationBadge />}
+        description="Configure the active backend source, detection thresholds, and alert behavior."
       />
 
       <form className="settings-layout" onSubmit={handleSubmit} noValidate>
         <div className="settings-main-column">
           <SourceSelector
             source={draft.source}
-            onChange={async (source) => {
-              handleChange("source", source)
-              await switchSource(source)
-            }}
+            sourceUrl={draft.sourceUrl}
+            usbIndex={draft.usbIndex}
+            onSourceUrlChange={(value) => handleChange("sourceUrl", value)}
+            onUsbIndexChange={(value) => handleChange("usbIndex", value)}
+            onChange={(source) => handleChange("source", source)}
           />
           <ThresholdForm settings={draft} errors={errors} onChange={handleChange} />
 
-          <Panel title="Alert audio" subtitle="Browser audio requires an explicit user gesture." simulated>
+          <Panel title="Alert audio" subtitle="Browser audio requires an explicit user gesture." simulated={false}>
             {soundBlocked && (
               <Alert className="sound-blocked-alert">
                 <AlertTriangle size={15} strokeWidth={1.75} aria-hidden="true" />
@@ -201,12 +191,12 @@ export default function SettingsPage() {
         </div>
 
         <aside className="settings-side-column">
-          <Panel title="Model selection" subtitle="Available after the backend exposes model metadata." simulated>
+          <Panel title="Model selection" subtitle="Reported from the active backend." simulated={false}>
             <FieldGroup>
               <Field data-disabled>
                 <FieldLabel htmlFor="deployed-model">Deployed model</FieldLabel>
-                <Input id="deployed-model" value="Not reported" disabled readOnly />
-                <FieldDescription>Model name, version, device, and license are not available in the local preview.</FieldDescription>
+                <Input id="deployed-model" value={modelInfo?.name ?? "Loading…"} disabled readOnly />
+                <FieldDescription>Model and device metadata update from the backend connection.</FieldDescription>
               </Field>
             </FieldGroup>
             <div className="settings-model-note">
@@ -215,16 +205,23 @@ export default function SettingsPage() {
             </div>
           </Panel>
 
-          <Panel title="Preview status" subtitle="Local runtime only" simulated>
-            <div className="settings-status-list">
-              <div><span>Camera source</span><strong>Generated still</strong></div>
-              <div><span>Backend API</span><strong>Not connected</strong></div>
-              <div><span>Event persistence</span><strong>In-memory</strong></div>
-              <div><span>Browser storage</span><strong>Not used</strong></div>
+          <Panel title="Camera preview" subtitle="The currently selected backend source" simulated={false}>
+            <div className="settings-camera-preview">
+              <img src={streamUrl("cam0")} alt="Live preview from selected camera source" />
+              <div><Wifi size={14} aria-hidden="true" /> {connectionStatus === "connected" ? "Live backend preview" : "Waiting for backend frames"}</div>
             </div>
           </Panel>
 
-          <Panel title="Apply settings" subtitle="Changes take effect only in this browser session." simulated>
+          <Panel title="Preview status" subtitle="Live runtime status" simulated={false}>
+            <div className="settings-status-list">
+              <div><span>Camera source</span><strong>{draft.source}</strong></div>
+              <div><span>Backend API</span><strong>{connectionStatus}</strong></div>
+              <div><span>Event persistence</span><strong>Backend session</strong></div>
+              <div><span>Browser storage</span><strong>Settings saved</strong></div>
+            </div>
+          </Panel>
+
+          <Panel title="Apply settings" subtitle="Saved until explicitly changed." simulated={false}>
             <div className="settings-save-actions">
               <Button type="submit">
                 <Check data-icon="inline-start" aria-hidden="true" />Save settings
@@ -240,7 +237,7 @@ export default function SettingsPage() {
 
       <div className="page-footnote">
         <AlertTriangle size={14} strokeWidth={1.75} aria-hidden="true" />
-        <span>RTSP text and selected files are local UI inputs only. This preview does not open a stream, upload a file, or apply settings to a backend.</span>
+        <span>Source selection is persisted in this browser and reapplied when the backend reconnects. Credentials are sent only to the configured backend.</span>
       </div>
     </div>
   )

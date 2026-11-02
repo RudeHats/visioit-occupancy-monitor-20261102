@@ -3,11 +3,15 @@ __pycache__/
 *.pyc
 .pytest_cache/
 .venv/
+.venv-cuda/
 *.egg-info/
 
 # Front-end
 Front-End/node_modules/
 Front-End/.next/
+Front-End/.next-verification/
+Front-End/test-results/
+Front-End/playwright-report/
 Front-End/.env.local
 Front-End/frontend/
 

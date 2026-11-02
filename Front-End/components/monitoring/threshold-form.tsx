@@ -18,7 +18,7 @@ export function ThresholdForm({
   onChange: <K extends keyof PreviewSettings>(key: K, value: PreviewSettings[K]) => void
 }) {
   return (
-    <Panel title="Detection thresholds" subtitle="Preview-only controls · not sent to a service" simulated>
+    <Panel title="Detection thresholds" subtitle="Applied to the active backend session" simulated={false}>
       <FieldSet className="settings-fieldset">
         <FieldLegend>Vacancy and confidence</FieldLegend>
         <FieldGroup>

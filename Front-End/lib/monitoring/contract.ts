@@ -29,10 +29,10 @@ export const backendModelSchema = z.object({
   task: z.string(),
   device: z.string(),
   classes_used: z.array(z.string()),
-  checkpoint: z.string,
+  checkpoint: z.string(),
   license: z.string(),
   simulated: z.boolean(),
-  mode: z.string,
+  mode: z.string(),
 })
 
 export type BackendModel = z.infer<typeof backendModelSchema>
@@ -59,6 +59,16 @@ export const backendMetricsSchema = z.object({
   }),
   device: z.string(),
   simulated: z.boolean(),
+  occupancy: z.object({
+    expected_seats: z.number(),
+    occupied_seats: z.number(),
+    vacant_seats: z.number(),
+    actual_people: z.number(),
+    unconfirmed_seats: z.number(),
+  }).optional(),
+  inference_strategy: z.string().optional(),
+  batch_seats: z.number().optional(),
+  skipped_frames: z.number().optional(),
 })
 
 export type BackendMetrics = z.infer<typeof backendMetricsSchema>
@@ -81,7 +91,7 @@ export const backendSettingsSchema = z.object({
   stale_timeout_s: z.number(),
   recovery_grace_s: z.number(),
   crop_padding: z.number(),
-  inference_mode: z.string(),
+  inference_mode: z.string().default("roi_crop"),
   target_inference_fps: z.number(),
   min_sharpness: z.number(),
 })
@@ -109,7 +119,7 @@ export const backendEventSchema = z.object({
   alert_id: z.string().nullable(),
   type: z.string(),
   severity: z.string(),
-  seat_id: z.string(),
+  seat_id: z.string().nullable(),
   camera_id: z.string(),
   message: z.string(),
   sound: z.boolean(),
@@ -142,14 +152,14 @@ export const backendInferenceSchema = z.object({
   quality: z.object({
     blur: z.number(),
     brightness: z.number(),
-    valid_roi_pixels: z.number(),
+    valid_roi_pixels: z.number().optional(),
     ok: z.boolean(),
   }),
   vacant_for_s: z.number(),
   latency: z.object({
     inference_ms: z.number(),
-    crop_ms: z.number,
-    pipeline_ms: z.number,
+    crop_ms: z.number().optional(),
+    pipeline_ms: z.number(),
   }),
   simulated: z.boolean(),
 })
@@ -175,7 +185,7 @@ export const backendStateChangeSchema = z.object({
   seat_id: z.string(),
   from: z.string(),
   to: z.string(),
-  reason: z.string(),
+  reason: z.string().optional(),
   since: z.string(),
 })
 

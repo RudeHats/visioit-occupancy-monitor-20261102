@@ -1,7 +1,7 @@
 "use client"
 
 import { create } from "zustand"
-import type { MonitorEvent, NormalizedPoint, PreviewSettings, Seat, SeatState } from "./domain"
+import { previewSettingsSchema, type MonitorEvent, type NormalizedPoint, type PreviewSettings, type Seat, type SeatState } from "./domain"
 import { demoEvents, demoSeats } from "../mock/preview-data"
 import { dedupeAlerts } from "./alerts"
 import { stopAlertTone } from "./alert-audio"
@@ -22,6 +22,8 @@ export const mockEnabled = process.env.NEXT_PUBLIC_USE_MOCK === "true"
 
 export const defaultPreviewSettings: PreviewSettings = {
   source: "synthetic",
+  sourceUrl: "",
+  usbIndex: 0,
   vacancyDurationSeconds: 180,
   confidenceThreshold: 0.78,
   alertCooldownSeconds: 300,
@@ -38,6 +40,16 @@ export const initialRegion: NormalizedPoint[] = [
 
 let demoEventSequence = 1
 let backendSocket: BackendSocket | null = null
+let connectionGeneration = 0
+const SETTINGS_KEY = "visioit.monitoring.settings.v2"
+function loadSavedSettings(): PreviewSettings {
+  if (typeof window === "undefined") return defaultPreviewSettings
+  try {
+    const value = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? "null")
+    const parsed = previewSettingsSchema.safeParse(value)
+    return parsed.success ? parsed.data : defaultPreviewSettings
+  } catch { return defaultPreviewSettings }
+}
 
 type MonitoringStore = {
   seats: Seat[]
@@ -82,7 +94,7 @@ type MonitoringStore = {
 export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
   seats: mockEnabled ? demoSeats : [],
   events: mockEnabled ? demoEvents : [],
-  settings: defaultPreviewSettings,
+  settings: loadSavedSettings(),
   region: initialRegion,
   savedRegion: initialRegion,
   soundUnlocked: false,
@@ -118,7 +130,7 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
     }
   },
 
-  updateSettings: (settings) => set({ settings }),
+  updateSettings: (settings) => { set({ settings }); if (typeof window !== "undefined") window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)) },
 
   setSoundUnlocked: (soundUnlocked) => set({ soundUnlocked, soundBlocked: false }),
 
@@ -188,22 +200,19 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
     })),
 
   switchSource: async (source) => {
-    if (!source || source === "synthetic") return
+    if (!source) return
     try {
       const result = await api.sourcesSelect({
         type: source,
+        url: source === "rtsp" ? get().settings.sourceUrl : undefined,
+        usb_index: source === "usb" ? get().settings.usbIndex : undefined,
         loop: true,
         target_fps: 15,
       })
-      // Don't set "connecting" — backend is still reachable, camera may be down
-      backendSocket?.disconnect()
-      backendSocket = null
-      // Reconnect WebSocket to pick up new source stream
-      void get().connectBackend()
+      get().setHealth(await api.health())
       return result
-    } catch {
-      // Source switch failed — backend might be down
-      get().setConnection("offline", "Source switch failed")
+    } catch (error) {
+      throw error
     }
   },
 
@@ -217,6 +226,7 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
     set((state) => ({ inferenceBySeat: { ...state.inferenceBySeat, [seatId]: inference } })),
 
   connectBackend: async () => {
+    const generation = ++connectionGeneration
     const existing = backendSocket
     if (existing) {
       existing.disconnect()
@@ -225,11 +235,23 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
     get().setConnection("connecting")
     try {
       const health = await api.health()
+      if (generation !== connectionGeneration) return false
       get().setHealth(health)
+      get().setConnection("connected")
+      const model = await api.model().catch(() => null)
+      if (generation !== connectionGeneration) return false
+      if (model) get().setModelInfo(model)
+      const saved = get().settings
+      if (typeof window !== "undefined" && window.localStorage.getItem(SETTINGS_KEY)) {
+        await api.sourcesSelect({ type: saved.source, url: saved.source === "rtsp" ? saved.sourceUrl : undefined, usb_index: saved.source === "usb" ? saved.usbIndex : undefined, loop: true, target_fps: 15 }).catch((error: unknown) => {
+          get().setConnection("connected", error instanceof Error ? `Camera configuration: ${error.message}` : "Camera configuration could not be restored")
+        })
+      }
       if (health.status !== "ok" && health.status !== "degraded") {
         get().setConnection("reconnecting", health.status)
         return false
       }
+      if (generation !== connectionGeneration) return false
 
       // Mark connected as soon as the backend responds to REST —
       // WebSocket is a bonus for real-time push, not a hard requirement.
@@ -245,7 +267,8 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
           get().setHealth(hello.snapshot.health)
           get().setSeats(hello.snapshot.seats.map(seatFromBackend))
           const settings = settingsFromBackend(hello.snapshot.settings)
-          get().updateSettings(settings)
+          const saved = get().settings
+          set({ settings: { ...saved, vacancyDurationSeconds: settings.vacancyDurationSeconds, confidenceThreshold: settings.confidenceThreshold, alertCooldownSeconds: settings.alertCooldownSeconds } })
           const firstSeat = hello.snapshot.seats[0]
           if (firstSeat) {
             const region = firstSeat.polygon.map(([x, y]) => [x, y] as NormalizedPoint)
@@ -292,13 +315,15 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
       }
 
       return true
-    } catch {
-      get().setConnection("offline", "Backend unreachable")
+    } catch (error) {
+      if (generation !== connectionGeneration) return false
+      get().setConnection("offline", error instanceof Error ? `Backend connection: ${error.message}` : "Backend unreachable")
       return false
     }
   },
 
   disconnectBackend: () => {
+    connectionGeneration += 1
     backendSocket?.disconnect()
     backendSocket = null
     get().setConnection("offline")
@@ -318,8 +343,11 @@ export const useMonitoringStore = create<MonitoringStore>()((set, get) => ({
       try {
         const health = await api.health()
         get().setHealth(health)
+        get().setConnection("connected")
+        const model = await api.model().catch(() => null)
+        if (model) get().setModelInfo(model)
       } catch {
-        // silently fail
+        get().setConnection("reconnecting", "Backend unreachable; retrying")
       }
     }, 5000)
 
